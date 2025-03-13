@@ -98,9 +98,17 @@ export default async function Dashboard() {
             />
 
             {/* Charts Section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <PortfolioChart className="w-[1300px]" />
-              <AssetAllocationChart />
+            <div className="flex flex-col gap-6">
+              <div className="w-full">
+                <PortfolioChart
+                  totalAssets={totalAssets}
+                  totalLiabilities={totalLiabilities}
+                  className="h-4/5 w-9/12"
+                />
+              </div>
+              <div className="w-full flex flex-col">
+                <AssetAllocationChart assets={assets} className="w-5/12" />
+              </div>
             </div>
 
             {/* Asset Categories Section */}

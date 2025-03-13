@@ -5,8 +5,37 @@ import { redirect } from "next/navigation";
 import { SubscriptionCheck } from "@/components/subscription-check";
 import AddAssetButton from "@/components/dashboard/add-asset-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CheckCircle2, AlertCircle, Trash2 } from "lucide-react";
+import { revalidatePath } from "next/cache";
 
-export default async function AssetsPage() {
+async function deleteAsset(formData: FormData) {
+  "use server";
+
+  const assetId = formData.get("assetId") as string;
+
+  if (!assetId) {
+    return;
+  }
+
+  const supabase = await createClient();
+
+  // Delete the asset
+  const { error } = await supabase.from("assets").delete().eq("id", assetId);
+
+  if (error) {
+    console.error("Error deleting asset:", error);
+  }
+
+  // Revalidate the page to show the updated list
+  revalidatePath("/dashboard/assets");
+}
+
+export default async function AssetsPage({
+  searchParams,
+}: {
+  searchParams: { success?: string; error?: string };
+}) {
   const supabase = await createClient();
 
   const {
@@ -23,6 +52,9 @@ export default async function AssetsPage() {
     .select("*, asset_categories(name, slug, icon)")
     .eq("is_liability", false);
 
+  const showSuccessAlert = searchParams.success === "true";
+  const showErrorAlert = searchParams.error === "true";
+
   return (
     <SubscriptionCheck>
       <DashboardNavbar />
@@ -30,6 +62,29 @@ export default async function AssetsPage() {
         <Sidebar />
         <main className="w-full bg-gray-50 min-h-screen pl-64">
           <div className="container mx-auto px-4 py-8 flex flex-col gap-8">
+            {/* Success/Error Alerts */}
+            {showSuccessAlert && (
+              <Alert className="bg-green-50 border-green-200">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <AlertTitle className="text-green-800">Success</AlertTitle>
+                <AlertDescription className="text-green-700">
+                  Your accounts have been successfully linked and assets
+                  imported from SnapTrade.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {showErrorAlert && (
+              <Alert className="bg-red-50 border-red-200">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertTitle className="text-red-800">Error</AlertTitle>
+                <AlertDescription className="text-red-700">
+                  There was a problem linking your accounts. Please try again or
+                  contact support.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Header Section */}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <h1 className="text-3xl font-bold">My Assets</h1>
@@ -37,21 +92,35 @@ export default async function AssetsPage() {
             </header>
 
             {/* Assets List */}
-            <Card>
-              <CardHeader>
-                <CardTitle>All Assets</CardTitle>
+            <Card className="shadow-sm border-gray-200 overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 pb-4">
+                <CardTitle className="text-blue-800 flex items-center gap-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="lucide lucide-briefcase"
+                  >
+                    <rect width="20" height="14" x="2" y="7" rx="2" ry="2" />
+                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                  </svg>
+                  All Assets
+                </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 {assets && assets.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full border-collapse">
                       <thead className="bg-muted/50 border-b">
                         <tr>
                           <th className="text-left p-3 font-medium text-sm">
                             Name
-                          </th>
-                          <th className="text-left p-3 font-medium text-sm">
-                            Identifier
                           </th>
                           <th className="text-right p-3 font-medium text-sm">
                             Quantity
@@ -66,7 +135,7 @@ export default async function AssetsPage() {
                             Gain/Loss
                           </th>
                           <th className="text-right p-3 font-medium text-sm">
-                            Change %
+                            Actions
                           </th>
                         </tr>
                       </thead>
@@ -105,16 +174,16 @@ export default async function AssetsPage() {
                           const gainLossEUR = gainLoss * eurRate;
 
                           return (
-                            <tr key={asset.id} className="hover:bg-muted/30">
+                            <tr
+                              key={asset.id}
+                              className="hover:bg-muted/30 transition-colors"
+                            >
                               <td className="p-3">
                                 <div className="font-medium">{asset.name}</div>
                                 <div className="text-xs text-muted-foreground">
                                   {asset.asset_categories?.name ||
                                     "Uncategorized"}
                                 </div>
-                              </td>
-                              <td className="p-3 text-sm">
-                                {isStock ? identifier : asset.location || "-"}
                               </td>
                               <td className="p-3 text-right">
                                 {isStock
@@ -157,20 +226,36 @@ export default async function AssetsPage() {
                                 )}
                               </td>
                               <td className="p-3 text-right">
-                                {isStock ? (
-                                  <div
-                                    className={
-                                      percentChange >= 0
-                                        ? "text-green-600"
-                                        : "text-red-600"
-                                    }
+                                <form action={deleteAsset}>
+                                  <input
+                                    type="hidden"
+                                    name="assetId"
+                                    value={asset.id}
+                                  />
+                                  <button
+                                    type="submit"
+                                    className="text-red-500 hover:text-red-700 transition-colors p-1 rounded-full hover:bg-red-50"
                                   >
-                                    {percentChange >= 0 ? "+" : ""}
-                                    {percentChange.toFixed(2)}%
-                                  </div>
-                                ) : (
-                                  "-"
-                                )}
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      className="lucide lucide-trash-2"
+                                    >
+                                      <path d="M3 6h18" />
+                                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                                      <line x1="10" x2="10" y1="11" y2="17" />
+                                      <line x1="14" x2="14" y1="11" y2="17" />
+                                    </svg>
+                                  </button>
+                                </form>
                               </td>
                             </tr>
                           );
@@ -179,10 +264,55 @@ export default async function AssetsPage() {
                     </table>
                   </div>
                 ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">
+                  <div className="text-center py-12 px-4 bg-gray-50">
+                    <div className="inline-flex rounded-full bg-blue-100 p-4 mb-4">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="text-blue-600"
+                      >
+                        <rect
+                          width="20"
+                          height="14"
+                          x="2"
+                          y="7"
+                          rx="2"
+                          ry="2"
+                        />
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                      </svg>
+                    </div>
+                    <p className="text-muted-foreground mb-2">
                       No assets found. Add your first asset to get started.
                     </p>
+                    <button
+                      onClick={() => {}}
+                      className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 8v8" />
+                        <path d="M8 12h8" />
+                      </svg>
+                      Add Asset
+                    </button>
                   </div>
                 )}
               </CardContent>

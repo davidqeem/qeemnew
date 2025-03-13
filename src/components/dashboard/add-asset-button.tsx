@@ -25,21 +25,26 @@ import {
 } from "@/components/ui/dialog";
 import { useState } from "react";
 import StockSearch from "./stock-search";
+import CryptoSearch from "./crypto-search";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AddAssetForm from "./add-asset-form";
+import { createClient } from "../../../supabase/client";
 
 export default function AddAssetButton() {
+  const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [showAssetTypes, setShowAssetTypes] = useState(true);
   const [showStocksOptions, setShowStocksOptions] = useState(false);
   const [activeTab, setActiveTab] = useState("cash");
   const [selectedAssetType, setSelectedAssetType] = useState("");
+  const [isLinking, setIsLinking] = useState(false);
 
   const handleClose = () => {
     setOpen(false);
     setShowAssetTypes(true);
     setShowStocksOptions(false);
     setShowStockSearch(false);
+    setShowCryptoSearch(false);
   };
 
   const handleAssetTypeSelect = (type: string) => {
@@ -48,15 +53,15 @@ export default function AddAssetButton() {
     if (type === "stocks") {
       setShowStocksOptions(true);
       setShowAssetTypes(false);
+    } else if (type === "crypto") {
+      setShowStocksOptions(true); // Reuse the same options UI
+      setShowAssetTypes(false);
     } else {
       setShowStocksOptions(false);
       setShowAssetTypes(false);
 
       // Map the selected type to the appropriate tab
       switch (type) {
-        case "crypto":
-          setActiveTab("cryptocurrency");
-          break;
         case "homes":
           setActiveTab("real-estate");
           break;
@@ -76,14 +81,54 @@ export default function AddAssetButton() {
   };
 
   const [showStockSearch, setShowStockSearch] = useState(false);
+  const [showCryptoSearch, setShowCryptoSearch] = useState(false);
 
-  const handleStocksOptionSelect = (option: string) => {
+  const handleStocksOptionSelect = async (option: string) => {
     setShowStocksOptions(false);
 
     if (option === "manual") {
-      setShowStockSearch(true);
+      if (selectedAssetType === "crypto") {
+        setShowCryptoSearch(true);
+      } else {
+        setShowStockSearch(true);
+      }
+    } else if (option === "link") {
+      try {
+        // Get the current user
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error("User not authenticated");
+        }
+
+        // Show loading state
+        setIsLinking(true);
+
+        console.log("Starting SnapTrade linking process for user:", user.id);
+
+        // Import dynamically to avoid server-side issues
+        const { createSnapTradeUserLink } = await import("@/utils/snaptrade");
+
+        // Create a link for the user
+        const origin = window.location.origin;
+        console.log("Using origin for redirect:", origin);
+
+        const redirectUri = await createSnapTradeUserLink(user.id, origin);
+
+        console.log("Received redirect URI:", redirectUri);
+
+        // Redirect to SnapTrade
+        window.location.href = redirectUri;
+      } catch (error) {
+        console.error("Error linking account:", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error";
+        alert(`Failed to link account: ${errorMessage}. Please try again.`);
+        setIsLinking(false);
+      }
     } else {
-      // For link option or any other
+      // For any other option
       setActiveTab("investments");
     }
   };
@@ -95,6 +140,16 @@ export default function AddAssetButton() {
     handleClose();
 
     // Refresh the page to show the newly added stock
+    window.location.href = "/dashboard/assets";
+  };
+
+  const handleCryptoSelect = (crypto: any, quantity: number) => {
+    // The crypto has been saved to the database in the CryptoSearch component
+    // Now we just need to close the dialog and potentially refresh the page
+    setShowCryptoSearch(false);
+    handleClose();
+
+    // Refresh the page to show the newly added cryptocurrency
     window.location.href = "/dashboard/assets";
   };
 
@@ -153,7 +208,7 @@ export default function AddAssetButton() {
     {
       id: "link",
       name: "Securely Link Accounts",
-      description: "Connect your investment accounts securely",
+      description: "Connect your investment accounts via SnapTrade",
       icon: <Lock className="h-6 w-6" />,
       color: "bg-blue-100 text-blue-600 hover:bg-blue-200",
     },
@@ -228,14 +283,21 @@ export default function AddAssetButton() {
                   key={option.id}
                   className={`flex items-center p-6 rounded-lg border transition-colors ${option.color}`}
                   onClick={() => handleStocksOptionSelect(option.id)}
+                  disabled={isLinking && option.id === "link"}
                 >
                   <div className="p-3 rounded-full bg-white mr-4">
-                    {option.icon}
+                    {isLinking && option.id === "link" ? (
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                    ) : (
+                      option.icon
+                    )}
                   </div>
                   <div className="text-left">
                     <div className="font-medium text-lg">{option.name}</div>
                     <div className="text-sm text-gray-600">
-                      {option.description}
+                      {isLinking && option.id === "link"
+                        ? "Connecting to SnapTrade..."
+                        : option.description}
                     </div>
                   </div>
                 </button>
@@ -273,29 +335,22 @@ export default function AddAssetButton() {
           </>
         )}
 
-        {!showAssetTypes && !showStocksOptions && !showStockSearch && (
+        {showCryptoSearch && (
           <>
             <DialogHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <DialogTitle>
-                    Add New{" "}
-                    {selectedAssetType.charAt(0).toUpperCase() +
-                      selectedAssetType.slice(1)}
-                  </DialogTitle>
+                  <DialogTitle>Add New Crypto</DialogTitle>
                   <DialogDescription>
-                    Add details about your asset to track it in your portfolio.
+                    Search for cryptocurrencies and add them to your portfolio.
                   </DialogDescription>
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    if (selectedAssetType === "stocks") {
-                      setShowStocksOptions(true);
-                    } else {
-                      setShowAssetTypes(true);
-                    }
+                    setShowCryptoSearch(false);
+                    setShowStocksOptions(true);
                   }}
                 >
                   Back
@@ -303,41 +358,87 @@ export default function AddAssetButton() {
               </div>
             </DialogHeader>
 
-            <Tabs
-              defaultValue="cash"
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="mt-4"
-            >
-              <TabsContent value="cash">
-                <AddAssetForm category="cash" onSuccess={handleClose} />
-              </TabsContent>
-
-              <TabsContent value="investments">
-                <AddAssetForm category="investments" onSuccess={handleClose} />
-              </TabsContent>
-
-              <TabsContent value="real-estate">
-                <AddAssetForm category="real-estate" onSuccess={handleClose} />
-              </TabsContent>
-
-              <TabsContent value="cryptocurrency">
-                <AddAssetForm
-                  category="cryptocurrency"
-                  onSuccess={handleClose}
-                />
-              </TabsContent>
-
-              <TabsContent value="debt">
-                <AddAssetForm
-                  category="debt"
-                  onSuccess={handleClose}
-                  isLiability={true}
-                />
-              </TabsContent>
-            </Tabs>
+            <div className="mt-4">
+              <CryptoSearch onCryptoSelect={handleCryptoSelect} />
+            </div>
           </>
         )}
+
+        {!showAssetTypes &&
+          !showStocksOptions &&
+          !showStockSearch &&
+          !showCryptoSearch && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <DialogTitle>
+                      Add New{" "}
+                      {selectedAssetType.charAt(0).toUpperCase() +
+                        selectedAssetType.slice(1)}
+                    </DialogTitle>
+                    <DialogDescription>
+                      Add details about your asset to track it in your
+                      portfolio.
+                    </DialogDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (selectedAssetType === "stocks") {
+                        setShowStocksOptions(true);
+                      } else {
+                        setShowAssetTypes(true);
+                      }
+                    }}
+                  >
+                    Back
+                  </Button>
+                </div>
+              </DialogHeader>
+
+              <Tabs
+                defaultValue="cash"
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="mt-4"
+              >
+                <TabsContent value="cash">
+                  <AddAssetForm category="cash" onSuccess={handleClose} />
+                </TabsContent>
+
+                <TabsContent value="investments">
+                  <AddAssetForm
+                    category="investments"
+                    onSuccess={handleClose}
+                  />
+                </TabsContent>
+
+                <TabsContent value="real-estate">
+                  <AddAssetForm
+                    category="real-estate"
+                    onSuccess={handleClose}
+                  />
+                </TabsContent>
+
+                <TabsContent value="cryptocurrency">
+                  <AddAssetForm
+                    category="cryptocurrency"
+                    onSuccess={handleClose}
+                  />
+                </TabsContent>
+
+                <TabsContent value="debt">
+                  <AddAssetForm
+                    category="debt"
+                    onSuccess={handleClose}
+                    isLiability={true}
+                  />
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
       </DialogContent>
     </Dialog>
   );
