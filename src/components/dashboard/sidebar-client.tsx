@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -12,6 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import React from "react";
 import { useState } from "react";
 
 export default function SidebarClient() {
@@ -59,6 +59,10 @@ export default function SidebarClient() {
 
   return (
     <div className="w-64 h-screen bg-white border-r border-gray-200 flex-shrink-0 fixed left-0 top-0 pt-16">
+      <h4 className="font-semibold tracking-tight sticky flex text-2xl justify-center items-start">
+        {" "}
+        QEEM
+      </h4>
       <div className="flex flex-col h-full overflow-y-auto py-6 px-4">
         <nav className="space-y-1">
           {navItems.map((item, index) => {

@@ -93,7 +93,7 @@ export default async function AssetsPage({
 
             {/* Assets List */}
             <Card className="shadow-sm border-gray-200 overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 pb-4">
+              <CardHeader className="from-blue-50 to-indigo-50 pb-4 bg-[#f0f0f0]">
                 <CardTitle className="text-blue-800 flex items-center gap-2">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"

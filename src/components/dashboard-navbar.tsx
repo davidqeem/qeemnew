@@ -27,14 +27,6 @@ export default function DashboardNavbar() {
     <nav className="w-full border-b border-gray-200 bg-white py-4">
       <div className="container mx-auto px-4 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            prefetch
-            className="text-xl font-bold flex items-center"
-          >
-            <BarChart3 className="h-6 w-6 mr-2 text-blue-600" />
-            <span>WealthTracker</span>
-          </Link>
           <div className="hidden md:flex items-center space-x-4 ml-8">
             <Link
               href="/dashboard"
